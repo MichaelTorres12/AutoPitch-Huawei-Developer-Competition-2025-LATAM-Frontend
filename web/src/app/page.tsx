@@ -7,6 +7,7 @@ import ConfigPanel, { Config } from "@/components/ConfigPanel";
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
 import { createMockDeck } from "@/lib/deck";
+import { saveVideoBlob } from "@/lib/videoStore";
 import { useRouter } from "next/navigation";
 
 type UploadTab = "local" | "record";
@@ -50,14 +51,21 @@ export default function LocalVideoPage() {
     [files]
   );
 
-  function onGenerate(config: Config) {
+  async function onGenerate(config: Config) {
     const slidesCount = config.slides === "6-8" ? 7 : config.slides === "10" ? 10 : 13;
     const deck = createMockDeck({
       objective: config.objective,
       tone: config.tone,
       slidesCount,
+      videoUrl: objectURL ?? undefined,
     });
-    router.push(`/slides/${deck.id}`);
+    try {
+      if (objectURL) {
+        const blob = await (await fetch(objectURL)).blob();
+        await saveVideoBlob(deck.id, blob);
+      }
+    } catch {}
+    router.push(`/slides?id=${deck.id}`);
   }
 
   // CLEAR HELPERS AND TAB SWITCH

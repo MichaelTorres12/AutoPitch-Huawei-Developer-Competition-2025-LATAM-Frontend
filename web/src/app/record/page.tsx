@@ -38,7 +38,11 @@ export default function RecordPage() {
   async function startRecording() {
     try {
       // Ask for screen + mic
-      const displayStream = await (navigator.mediaDevices as any).getDisplayMedia({
+      type ScreenMediaDevices = MediaDevices & {
+        // Some TS lib targets don't include DisplayMediaStreamConstraints; use unknown for compatibility
+        getDisplayMedia: (constraints?: unknown) => Promise<MediaStream>;
+      };
+      const displayStream = await (navigator.mediaDevices as ScreenMediaDevices).getDisplayMedia({
         video: { frameRate: 30 },
         audio: true,
       });

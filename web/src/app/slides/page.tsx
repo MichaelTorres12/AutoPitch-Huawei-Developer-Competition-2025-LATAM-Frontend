@@ -1,22 +1,35 @@
 "use client";
 import DashboardShell from "@/components/DashboardShell";
 import { loadDeck, type Deck } from "@/lib/deck";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PptxGenJS from "pptxgenjs";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
 
-export default function SlidesPage({ params }: { params: { id: string } }) {
+function SlidesInner() {
   const router = useRouter();
+  const search = useSearchParams();
+  const id = search.get("id") || "";
   const [deck, setDeck] = useState<Deck | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const d = loadDeck(params.id);
+    if (!id) return;
+    const d = loadDeck(id);
     setDeck(d);
-  }, [params.id]);
+    (async () => {
+      if (!d) return;
+      try {
+        const { loadVideoBlob } = await import("@/lib/videoStore");
+        const blob = await loadVideoBlob(d.id);
+        if (blob) setVideoUrl(URL.createObjectURL(blob));
+      } catch {}
+    })();
+  }, [id]);
 
   const totalTime = useMemo(() => deck?.slides.reduce((s, sl) => s + (sl.suggestedTimeSec ?? 0), 0) ?? 0, [deck]);
   const fullScript = useMemo(
@@ -51,7 +64,7 @@ export default function SlidesPage({ params }: { params: { id: string } }) {
       el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [scrollerRef.current]);
+  }, [deck]);
 
   function downloadPptx() {
     if (!deck) return;
@@ -70,7 +83,7 @@ export default function SlidesPage({ params }: { params: { id: string } }) {
     pptx.writeFile({ fileName: `${deck.id}.pptx` });
   }
 
-  if (!deck) {
+  if (!id || !deck) {
     return (
       <DashboardShell>
         <div className="text-sm">Deck not found. <button className="underline" onClick={() => router.push("/")}>Go back</button></div>
@@ -121,8 +134,8 @@ export default function SlidesPage({ params }: { params: { id: string } }) {
                 </ul>
               </div>
               {sl.imageUrl && (
-                <div className="bg-black">
-                  <img src={sl.imageUrl} alt="slide" className="w-full h-48 object-cover" />
+                <div className="bg-black relative h-48">
+                  <Image src={sl.imageUrl} alt="slide" fill className="object-cover" />
                 </div>
               )}
               <div className="p-4 bg-gray-50 text-sm">
@@ -141,7 +154,24 @@ export default function SlidesPage({ params }: { params: { id: string } }) {
         <h2 className="text-lg font-semibold">Guion completo</h2>
         <div className="mt-2 rounded-lg border bg-white p-4 text-sm whitespace-pre-wrap">{fullScript}</div>
       </div>
+
+      {videoUrl && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold">Video de origen</h2>
+          <div className="rounded-xl overflow-hidden border bg-black mt-2">
+            <video src={videoUrl} controls className="w-full h-[420px] object-contain bg-black" />
+          </div>
+        </div>
+      )}
     </DashboardShell>
+  );
+}
+
+export default function SlidesPage() {
+  return (
+    <Suspense fallback={<DashboardShell><div className="text-sm">Loading…</div></DashboardShell>}>
+      <SlidesInner />
+    </Suspense>
   );
 }
 

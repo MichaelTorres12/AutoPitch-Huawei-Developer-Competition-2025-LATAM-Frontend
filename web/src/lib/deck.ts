@@ -13,12 +13,14 @@ export type Deck = {
   objective: string;
   tone: string;
   slides: DeckSlide[];
+  videoUrl?: string;
 };
 
 export function createMockDeck(params: {
   objective: string;
   tone: string;
   slidesCount: number;
+  videoUrl?: string;
 }): Deck {
   const id = `deck_${Date.now()}`;
   const blocks: DeckSlide[] = [];
@@ -55,6 +57,7 @@ export function createMockDeck(params: {
     objective: params.objective,
     tone: params.tone,
     slides: blocks,
+    videoUrl: params.videoUrl,
   };
 
   // persist
