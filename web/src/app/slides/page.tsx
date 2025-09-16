@@ -4,7 +4,7 @@ import { loadDeck, type Deck } from "@/lib/deck";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PptxGenJS from "pptxgenjs";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, X } from "lucide-react";
 import Image from "next/image";
 
 function SlidesInner() {
@@ -16,6 +16,7 @@ function SlidesInner() {
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isSummaryOpen, setIsSummaryOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!id) return;
@@ -43,6 +44,21 @@ function SlidesInner() {
         : "",
     [deck]
   );
+
+  const summaryText = useMemo(() => {
+    if (!deck) return "";
+    const hasVideo = !!videoUrl;
+    const slidesCount = deck.slides.length;
+    const minutes = Math.max(1, Math.round(totalTime / 60));
+    return [
+      `Resumen de generación`,
+      `Objetivo: ${deck.objective}`,
+      `Tono: ${deck.tone}`,
+      `Slides: ${slidesCount} · Tiempo estimado: ~${minutes} min`,
+      `Video fuente: ${hasVideo ? "incluido" : "no disponible"}`,
+      "AQUI SE MOSTRARIA EL RESUMEN QUE SE OBTUVO DEL VIDEO Y SE USO PARA LA GENERACION DEL PITCH DECK + GUION"
+    ].join("\n");
+  }, [deck, videoUrl, totalTime]);
 
   function updateEdges() {
     const el = scrollerRef.current;
@@ -162,6 +178,36 @@ function SlidesInner() {
             <video src={videoUrl} controls className="w-full h-[420px] object-contain bg-black" />
           </div>
         </div>
+      )}
+
+      {/* Floating Summary Button */}
+      <button
+        aria-label="Resumen"
+        onClick={() => setIsSummaryOpen(true)}
+        className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg bg-gray-900 text-white text-sm inline-flex items-center gap-2"
+      >
+        <FileText className="w-4 h-4" /> Resumen
+      </button>
+
+      {/* Right Drawer Modal */}
+      {isSummaryOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-40"
+            onClick={() => setIsSummaryOpen(false)}
+          />
+          <aside className="fixed top-0 right-0 h-screen w-full max-w-md bg-white z-50 shadow-xl border-l flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="font-semibold">Resumen</div>
+              <button aria-label="Cerrar" onClick={() => setIsSummaryOpen(false)} className="h-8 w-8 grid place-items-center rounded-md hover:bg-gray-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto text-sm whitespace-pre-wrap">
+              {summaryText}
+            </div>
+          </aside>
+        </>
       )}
     </DashboardShell>
   );

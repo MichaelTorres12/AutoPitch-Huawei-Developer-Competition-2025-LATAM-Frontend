@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Camera, Upload, Video } from "lucide-react";
+import { Camera, Upload, Video, FileText, X } from "lucide-react";
 import DashboardShell from "@/components/DashboardShell";
 import ConfigPanel, { Config } from "@/components/ConfigPanel";
 import { useEffect, useRef } from "react";
@@ -18,6 +18,7 @@ export default function LocalVideoPage() {
   const [activeTab, setActiveTab] = useState<UploadTab>("local");
   const [files, setFiles] = useState<File[]>([]);
   const [objectURL, setObjectURL] = useState<string | null>(null);
+  const [isSummaryOpen, setIsSummaryOpen] = useState<boolean>(false);
   // recording state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
@@ -50,6 +51,23 @@ export default function LocalVideoPage() {
       })),
     [files]
   );
+
+  const summaryText = useMemo(() => {
+    const hasVideo = !!objectURL;
+    const fileName = fileList[0]?.name ?? (activeTab === "record" ? "recording.webm" : "video.mp4");
+    const size = fileList[0]?.sizeMB ? `${fileList[0]?.sizeMB} MB` : "—";
+    return [
+      `Resumen de demo` ,
+      `Fuente: ${hasVideo ? fileName : "Sin video aún"} (${size})`,
+      "Qué hará la IA:",
+      "• Transcribir y entender el audio (ASR/NLP)",
+      "• Detectar momentos clave + cambios de escena",
+      "• Capturar frames óptimos y extraer paleta de colores",
+      "• Generar Pitch Deck (.pptx) con narrativa y branding",
+      "• Crear guion del presentador con tiempos sugeridos",
+      "Configurable: Objetivo, Tono y Nº de slides",
+    ].join("\n");
+  }, [objectURL, fileList, activeTab]);
 
   async function onGenerate(config: Config) {
     const slidesCount = config.slides === "6-8" ? 7 : config.slides === "10" ? 10 : 13;
@@ -277,6 +295,35 @@ export default function LocalVideoPage() {
             </section>
           )}
         </div>
+        {/* Floating Summary Button */}
+        <button
+          aria-label="Resumen"
+          onClick={() => setIsSummaryOpen(true)}
+          className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg bg-gray-900 text-white text-sm inline-flex items-center gap-2"
+        >
+          <FileText className="w-4 h-4" /> Resumen
+        </button>
+
+        {/* Right Drawer Modal */}
+        {isSummaryOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/30 z-40"
+              onClick={() => setIsSummaryOpen(false)}
+            />
+            <aside className="fixed top-0 right-0 h-screen w-full max-w-md bg-white z-50 shadow-xl border-l flex flex-col">
+              <div className="p-4 border-b flex items-center justify-between">
+                <div className="font-semibold">Resumen</div>
+                <button aria-label="Cerrar" onClick={() => setIsSummaryOpen(false)} className="h-8 w-8 grid place-items-center rounded-md hover:bg-gray-100">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto text-sm whitespace-pre-wrap">
+                {summaryText}
+              </div>
+            </aside>
+          </>
+        )}
     </DashboardShell>
   );
 }
