@@ -52,23 +52,6 @@ export default function LocalVideoPage() {
     [files]
   );
 
-  const summaryText = useMemo(() => {
-    const hasVideo = !!objectURL;
-    const fileName = fileList[0]?.name ?? (activeTab === "record" ? "recording.webm" : "video.mp4");
-    const size = fileList[0]?.sizeMB ? `${fileList[0]?.sizeMB} MB` : "—";
-    return [
-      `Resumen de demo` ,
-      `Fuente: ${hasVideo ? fileName : "Sin video aún"} (${size})`,
-      "Qué hará la IA:",
-      "• Transcribir y entender el audio (ASR/NLP)",
-      "• Detectar momentos clave + cambios de escena",
-      "• Capturar frames óptimos y extraer paleta de colores",
-      "• Generar Pitch Deck (.pptx) con narrativa y branding",
-      "• Crear guion del presentador con tiempos sugeridos",
-      "Configurable: Objetivo, Tono y Nº de slides",
-    ].join("\n");
-  }, [objectURL, fileList, activeTab]);
-
   async function onGenerate(config: Config) {
     const slidesCount = config.slides === "6-8" ? 7 : config.slides === "10" ? 10 : 13;
     const deck = createMockDeck({
@@ -317,9 +300,6 @@ export default function LocalVideoPage() {
                 <button aria-label="Cerrar" onClick={() => setIsSummaryOpen(false)} className="h-8 w-8 grid place-items-center rounded-md hover:bg-gray-100">
                   <X className="w-4 h-4" />
                 </button>
-              </div>
-              <div className="p-4 overflow-y-auto text-sm whitespace-pre-wrap">
-                {summaryText}
               </div>
             </aside>
           </>
