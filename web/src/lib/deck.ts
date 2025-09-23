@@ -83,4 +83,28 @@ export function loadDeck(id: string): Deck | null {
   }
 }
 
+// Convert backend response to Deck shape
+export function deckFromProcess(id: string, objective: string, tone: string, resp: {
+  pitch_deck: { slides: { title: string; bullets: string[] }[]; script?: { slide: number; what_to_say: string }[] };
+  frame_urls?: string[];
+  input_video_url?: string;
+}): Deck {
+  const slides: DeckSlide[] = resp.pitch_deck.slides.map((s, idx) => ({
+    id: `${idx + 1}`,
+    title: s.title,
+    bullets: s.bullets || [],
+    imageUrl: resp.frame_urls?.[idx] || resp.frame_urls?.[0],
+    speakerNotes: resp.pitch_deck.script?.find((sc) => sc.slide === idx + 1)?.what_to_say,
+    suggestedTimeSec: 30,
+  }));
+  return {
+    id,
+    createdAt: Date.now(),
+    objective,
+    tone,
+    slides,
+    videoUrl: resp.input_video_url,
+  };
+}
+
 

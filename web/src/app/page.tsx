@@ -6,9 +6,10 @@ import DashboardShell from "@/components/DashboardShell";
 import ConfigPanel, { Config } from "@/components/ConfigPanel";
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
-import { createMockDeck } from "@/lib/deck";
-import { saveVideoBlob } from "@/lib/videoStore";
 import { useRouter } from "next/navigation";
+import { uploadVideo, processFromUpload } from "@/lib/api";
+import { deckFromProcess } from "@/lib/deck";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 type UploadTab = "local" | "record";
 
@@ -18,6 +19,7 @@ export default function LocalVideoPage() {
   const [activeTab, setActiveTab] = useState<UploadTab>("local");
   const [files, setFiles] = useState<File[]>([]);
   const [objectURL, setObjectURL] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   // recording state
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
@@ -52,20 +54,58 @@ export default function LocalVideoPage() {
   );
 
   async function onGenerate(config: Config) {
-    const slidesCount = config.slides === "6-8" ? 7 : config.slides === "10" ? 10 : 13;
-    const deck = createMockDeck({
-      objective: config.objective,
-      tone: config.tone,
-      slidesCount,
-      videoUrl: objectURL ?? undefined,
-    });
+    setIsLoading(true);
+    // 1) ensure we have a file to upload; if from recording, objectURL exists
+    let uploadId: string | null = null;
     try {
-      if (objectURL) {
+      if (files[0]) {
+        // uploaded via Local Video dropzone
+        const up = await uploadVideo(files[0]);
+        uploadId = up.id;
+      } else if (objectURL) {
         const blob = await (await fetch(objectURL)).blob();
-        await saveVideoBlob(deck.id, blob);
+        const file = new File([blob], "recording.webm", { type: blob.type || "video/webm" });
+        const up = await uploadVideo(file);
+        uploadId = up.id;
       }
-    } catch {}
-    router.push(`/slides?id=${deck.id}`);
+    } catch {
+      alert("No se pudo subir el video al backend");
+      setIsLoading(false);
+      return;
+    }
+    if (!uploadId) {
+      alert("No hay video para procesar");
+      setIsLoading(false);
+      return;
+    }
+
+    // 2) trigger processing pipeline
+    try {
+      const proc = await processFromUpload({
+        uploadId,
+        language: "es",
+        objective: config.objective,
+        tone: config.tone,
+        slidesNumber: config.slides,
+      });
+
+      if (!proc.ok) throw new Error("Proceso fallido");
+
+      // 3) build Deck and persist
+      const deckId = `deck_${uploadId}`;
+      const deck = deckFromProcess(deckId, config.objective, config.tone, proc);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(`deck_${deckId}`, JSON.stringify(deck));
+        const list = JSON.parse(window.localStorage.getItem("decks_index") || "[]");
+        list.unshift({ id: deckId, createdAt: deck.createdAt });
+        window.localStorage.setItem("decks_index", JSON.stringify(list));
+      }
+      router.push(`/slides?id=${deckId}`);
+    } catch {
+      alert("No se pudo procesar el video");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   // CLEAR HELPERS AND TAB SWITCH
@@ -277,6 +317,7 @@ export default function LocalVideoPage() {
             </section>
           )}
         </div>
+        {isLoading && <LoadingOverlay message="Generando Pitch Deck con IA…" />}
     </DashboardShell>
   );
 }

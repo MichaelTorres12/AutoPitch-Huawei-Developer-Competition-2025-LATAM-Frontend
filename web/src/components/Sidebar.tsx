@@ -26,8 +26,8 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <aside className="border-r px-4 py-6 flex flex-col gap-6 bg-white h-full overflow-y-auto">
-      <div className="text-sm font-semibold tracking-wide text-gray-500">{t("workspace")}</div>
+    <aside className="border-r px-4 py-6 flex flex-col gap-6 bg-blue-950 h-full overflow-y-auto">
+      <div className="text-base font-semibold tracking-wide text-white">{t("workspace")}</div>
       <nav className="flex flex-col gap-2">
         {navItems.map((item) => {
           const active = pathname === item.href;
@@ -36,7 +36,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-                active ? "bg-gray-100 text-gray-900" : "text-gray-700 hover:bg-gray-50"
+                active ? "bg-gray-50 text-orange-700 font-semibold border-l-10 border-orange-500" : "text-white hover:bg-orange-300 hover:text-black"
               }`}
             >
               {item.icon}
@@ -46,11 +46,11 @@ export default function Sidebar() {
         })}
       </nav>
       <div className="mt-auto flex flex-col gap-3">
-        <div className="text-xs text-gray-500">{t("switchLanguage")}</div>
+        <div className="text-xs text-white">{t("switchLanguage")}</div>
         <div className="text-sm flex items-center gap-2">
-          <Globe className="w-4 h-4 text-gray-500" />
+          <Globe className="w-4 h-4 text-white" />
           <select
-            className="border rounded-md px-2 py-1 text-sm"
+            className="border rounded-md px-2 py-1 text-sm bg-white text-black cursor-pointer"
             value={lang}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLang(e.target.value as Lang)}
           >
@@ -62,11 +62,11 @@ export default function Sidebar() {
         </div>
         {user ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-gray-700 truncate max-w-[140px]" title={user.email}>{user.email}</span>
+            <span className="text-sm text-white truncate max-w-[140px]" title={user.email}>{user.email}</span>
             <button className="h-8 px-3 rounded-md border text-sm" onClick={signOut}>Logout</button>
           </div>
         ) : (
-          <button className="h-10 rounded-md bg-gray-900 text-white text-sm" onClick={() => setOpen(true)}>{t("signIn")}</button>
+          <button className="h-10 rounded-md bg-gray-300 text-black text-sm cursor-pointer" onClick={() => setOpen(true)}>{t("signIn")}</button>
         )}
         <AuthModal open={open} onClose={() => setOpen(false)} />
       </div>

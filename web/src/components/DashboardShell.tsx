@@ -10,8 +10,8 @@ export default function DashboardShell({
       <div className="h-screen sticky top-0">
         <Sidebar />
       </div>
-      <main className="px-8 py-10 h-screen overflow-y-auto">
-        <div className="max-w-[1200px] mx-auto">{children}</div>
+      <main className="h-screen overflow-y-auto">
+        <div className="">{children}</div>
       </main>
     </div>
   );
