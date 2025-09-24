@@ -142,7 +142,7 @@ export default function RecordPage() {
       </p>
 
       {!previewURL ? (
-        <div className="mt-6 grid lg:grid-cols-[1fr_380px] gap-6">
+        <div className="mt-6 grid lg:grid-cols-[1fr_500px] gap-6">
           <div className="rounded-xl overflow-hidden border bg-black">
             <video ref={videoRef} className="w-full h-[420px] object-contain bg-black" playsInline muted />
             <div className="p-3 text-xs text-white/80 bg-black/90 flex items-center justify-between">
@@ -169,7 +169,7 @@ export default function RecordPage() {
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid lg:grid-cols-[1fr_380px] gap-6">
+        <div className="mt-6 grid lg:grid-cols-[1fr_500px] gap-6">
           <div className="rounded-xl overflow-hidden border bg-black">
             <video src={previewURL} controls className="w-full h-[420px] object-contain bg-black" />
           </div>

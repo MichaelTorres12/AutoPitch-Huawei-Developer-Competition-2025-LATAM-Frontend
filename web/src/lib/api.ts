@@ -38,6 +38,7 @@ export type ProcessResponse = {
   input_video_url?: string;
   audio_url?: string;
   frame_urls?: string[];
+  srt_url?: string;
 };
 
 export async function processFromUpload(payload: ProcessRequest): Promise<ProcessResponse> {

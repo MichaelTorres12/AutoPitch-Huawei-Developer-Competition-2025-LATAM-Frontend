@@ -211,29 +211,39 @@ export default function LocalVideoPage() {
 
   return (
     <DashboardShell>
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex items-center gap-3 justify-center">
-            <Video className="w-8 h-8 text-indigo-600" />
-            <span className="text-2xl">→</span>
-            <Upload className="w-8 h-8 text-orange-500" />
+        <div className="max-w-8xl mx-auto px-4 xl:px-20 py-8">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 bg-white/70 backdrop-blur-sm shadow-sm">
+              <Video className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-medium text-gray-600">Pitch deck desde tu video</span>
+            </div>
+            <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight">
+              {t("tagline")}
+            </h1>
+            <p className="mt-2 text-sm text-gray-500">Sube un demo o graba tu pitch en vivo.</p>
           </div>
-          <h1 className="text-center text-2xl sm:text-3xl font-semibold mt-4">
-            {t("tagline")}
-          </h1>
 
           <div className="mt-6 flex justify-center">
-            <div className="inline-flex rounded-lg border bg-white overflow-hidden">
+            <div
+              role="tablist"
+              aria-label="Modo de entrada"
+              className="flex items-center gap-1 rounded-full border bg-gray-100 p-1 shadow-inner"
+            >
               <button
-                className={`px-4 py-2 text-sm flex items-center gap-2 ${
-                  activeTab === "local" ? "bg-gray-100" : ""
+                role="tab"
+                aria-selected={activeTab === "local"}
+                className={`cursor-pointer inline-flex items-center gap-2 rounded-full px-4 sm:px-5 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 ${
+                  activeTab === "local" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
                 }`}
                 onClick={() => handleSwitchTab("local")}
               >
                 <Upload className="w-4 h-4" /> {t("localVideo")}
               </button>
               <button
-                className={`px-4 py-2 text-sm flex items-center gap-2 ${
-                  activeTab === "record" ? "bg-gray-100" : ""
+                role="tab"
+                aria-selected={activeTab === "record"}
+                className={`cursor-pointer inline-flex items-center gap-2 rounded-full px-4 sm:px-5 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 ${
+                  activeTab === "record" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
                 }`}
                 onClick={() => handleSwitchTab("record")}
               >
@@ -248,18 +258,18 @@ export default function LocalVideoPage() {
                 <div
                   {...getRootProps()}
                   className={`rounded-2xl border-2 border-dashed p-10 sm:p-14 text-center transition-colors ${
-                    isDragActive ? "border-indigo-500 bg-indigo-50" : "border-gray-200"
+                    isDragActive ? "border-indigo-400/70 bg-indigo-50" : "border-gray-200 bg-white"
                   }`}
                 >
                   <input {...getInputProps()} />
-                  <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center">
+                  <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center ring-1 ring-inset ring-indigo-200/60">
                     <Upload className="w-8 h-8 text-indigo-600" />
                   </div>
                   <h2 className="mt-4 text-xl font-semibold">{t("uploadYourVideo")}</h2>
                   <p className="mt-2 text-sm text-gray-600">{t("dragOrClick")}</p>
                   <div className="mt-6">
-                    <button className="px-5 py-2 rounded-md bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm shadow">
-                      Select video files
+                    <button aria-label="Seleccionar archivos de video" className="cursor-pointer h-10 px-5 rounded-full bg-gray-900 text-white text-sm shadow-sm hover:bg-black transition-colors">
+                      Seleccionar archivos de video
                     </button>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 justify-center text-[11px] text-gray-500">
@@ -273,11 +283,13 @@ export default function LocalVideoPage() {
                   </div>
                 </div>
               ) : (
-                <div className="grid lg:grid-cols-[1fr_380px] gap-6">
-                  <div className="rounded-xl overflow-hidden border bg-black">
+                <div className="grid lg:grid-cols-[1fr_500px] gap-6">
+                  <div className="rounded-xl overflow-hidden border bg-black shadow-sm">
                     {/* preview */}
-                    <video src={objectURL} controls className="w-full h-[420px] object-contain bg-black" />
-                    <div className="p-3 text-xs text-gray-300 bg-black/90 flex justify-between">
+                    <div className="h-[460px] flex items-center justify-center bg-black">
+                      <video src={objectURL} controls className="max-h-full max-w-full object-contain bg-black" />
+                    </div>
+                    <div className="p-3 text-xs text-gray-300/90 bg-black/90 flex justify-between">
                       <span>{fileList[0]?.name}</span>
                       <span>{fileList[0]?.sizeMB} MB</span>
                     </div>
@@ -289,27 +301,31 @@ export default function LocalVideoPage() {
           ) : (
             <section className="mt-6">
               {!objectURL ? (
-                <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+                <div className="grid lg:grid-cols-[1fr_500px] gap-6">
                   <div className="rounded-xl overflow-hidden border bg-black">
-                    <video ref={videoRef} className="w-full h-[420px] object-contain bg-black" playsInline muted />
+                    <div className="h-[460px] flex items-center justify-center bg-black">
+                      <video ref={videoRef} className="max-h-full max-w-full object-contain bg-black" playsInline muted />
+                    </div>
                     <div className="p-3 text-xs text-white/80 bg-black/90 flex items-center justify-between" />
                   </div>
-                  <div className="rounded-xl border bg-white p-4">
+                  <div className="rounded-xl border bg-white p-4 shadow-sm">
                     <h3 className="font-semibold">{t("controls")}</h3>
                     <div className="mt-4 flex gap-3">
                       {!mediaStream ? (
-                        <button onClick={startRecording} className="h-10 px-4 rounded-md bg-gray-900 text-white text-sm">{t("startRecording")}</button>
+                        <button onClick={startRecording} className="cursor-pointer h-10 px-4 rounded-full bg-gray-900 text-white text-sm hover:bg-black transition-colors">{t("startRecording")}</button>
                       ) : (
-                        <button onClick={stopRecording} className="h-10 px-4 rounded-md bg-red-600 text-white text-sm">{t("stop")}</button>
+                        <button onClick={stopRecording} className="cursor-pointer h-10 px-4 rounded-full bg-red-600 text-white text-sm hover:bg-red-700 transition-colors">{t("stop")}</button>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-3">{t("willCapture")}</p>
                   </div>
                 </div>
               ) : (
-                <div className="grid lg:grid-cols-[1fr_380px] gap-6">
-                  <div className="rounded-xl overflow-hidden border bg-black">
-                    <video src={objectURL} controls className="w-full h-[420px] object-contain bg-black" />
+                <div className="grid lg:grid-cols-[1fr_500px] gap-6">
+                  <div className="rounded-xl overflow-hidden border bg-black shadow-sm">
+                    <div className="h-[460px] flex items-center justify-center bg-black">
+                      <video src={objectURL} controls className="max-h-full max-w-full object-contain bg-black" />
+                    </div>
                   </div>
                   <ConfigPanel onGenerate={onGenerate} />
                 </div>

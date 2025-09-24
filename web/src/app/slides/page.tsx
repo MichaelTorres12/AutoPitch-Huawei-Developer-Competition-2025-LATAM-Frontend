@@ -6,10 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, FileText, X, Play, ChevronLeft, Download, TvMinimalPlay } from "lucide-react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import LoadingOverlay from "@/components/LoadingOverlay";
-import { processFromUpload } from "@/lib/api";
-import { deckFromProcess } from "@/lib/deck";
+// import LoadingOverlay from "@/components/LoadingOverlay";
 import PptxGenJS from "pptxgenjs";
+import SlideView from "@/components/SlideView";
+import SlideThumb from "@/components/SlideThumb";
 
 function SlidesInner() {
   const router = useRouter();
@@ -23,11 +23,23 @@ function SlidesInner() {
   const [isSummaryOpen, setIsSummaryOpen] = useState<boolean>(false);
   const [isVideoOpen, setIsVideoOpen] = useState<boolean>(false);
   const [notesOpen, setNotesOpen] = useState<boolean>(true);
+  const [leftOpen, setLeftOpen] = useState<boolean>(true);
+  const THEMES: Record<string, { name: string; bgGradient: string; titleClass: string; accent: string; titleColorHex: string; bulletColorHex: string }>= {
+    teal: { name: "Aqua", bgGradient: "from-teal-200 via-teal-300 to-teal-500", titleClass: "text-blue-600", accent: "from-cyan-400 to-teal-500", titleColorHex: "1f4ed8", bulletColorHex: "333333" },
+    sunset: { name: "Sunset", bgGradient: "from-rose-200 via-orange-200 to-yellow-200", titleClass: "text-rose-600", accent: "from-rose-500 to-orange-400", titleColorHex: "be123c", bulletColorHex: "374151" },
+    gold: { name: "Golden", bgGradient: "from-amber-100 via-yellow-200 to-amber-300", titleClass: "text-amber-700", accent: "from-amber-400 to-yellow-300", titleColorHex: "b45309", bulletColorHex: "374151" },
+  };
+  const [theme, setTheme] = useState<keyof typeof THEMES>("teal");
   const activeSlide = deck?.slides[current];
   const [isPresenting, setIsPresenting] = useState<boolean>(false);
   const presentRef = useRef<HTMLDivElement | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
-  const uploadIdFromDeck = (id.startsWith("deck_") ? id.replace(/^deck_/, "") : id);
+  // regeneration state reserved for future feature
+  // const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
+  // const uploadIdFromDeck = (id.startsWith("deck_") ? id.replace(/^deck_/, "") : id);
+  const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
+  function toggleExpandNotes(slideId: string) {
+    setExpandedNotes((prev) => ({ ...prev, [slideId]: !prev[slideId] }));
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -46,21 +58,47 @@ function SlidesInner() {
   }, [id]);
 
   const totalTime = useMemo(() => deck?.slides.reduce((s, sl) => s + (sl.suggestedTimeSec ?? 0), 0) ?? 0, [deck]);
+  const minutes = useMemo(() => Math.max(1, Math.round(totalTime / 60)), [totalTime]);
+  const [transcript, setTranscript] = useState<string>("");
+  useEffect(() => {
+    async function loadSrt() {
+      if (!deck?.transcriptUrl || !isSummaryOpen) return;
+      try {
+        const res = await fetch(deck.transcriptUrl);
+        const srt = await res.text();
+        // Basic SRT -> plain text cleanup
+        const text = srt
+          .replace(/\r/g, "")
+          .split("\n\n")
+          .map(block => block
+            .split("\n")
+            .filter((line, idx) => idx > 1 || !/^\d+$/.test(line)) // drop index line
+            .filter(line => !/\d{2}:\d{2}:\d{2},\d{3} -->/.test(line)) // drop timestamps
+            .join(" ")
+          )
+          .join("\n");
+        setTranscript(text.trim());
+      } catch {
+        setTranscript("");
+      }
+    }
+    loadSrt();
+  }, [deck?.transcriptUrl, isSummaryOpen]);
 
   const summaryText = useMemo(() => {
     if (!deck) return "";
     const hasVideo = !!videoUrl;
     const slidesCount = deck.slides.length;
-    const minutes = Math.max(1, Math.round(totalTime / 60));
-    return [
+    const parts = [
       `Resumen de generación`,
       `Objetivo: ${deck.objective}`,
       `Tono: ${deck.tone}`,
       `Slides: ${slidesCount} · Tiempo estimado: ~${minutes} min`,
       `Video fuente: ${hasVideo ? "incluido" : "no disponible"}`,
-      "AQUI SE MOSTRARIA EL RESUMEN QUE SE OBTUVO DEL VIDEO Y SE USO PARA LA GENERACION DEL PITCH DECK + GUION"
-    ].join("\n");
-  }, [deck, videoUrl, totalTime]);
+    ];
+    if (deck.summary) parts.push(deck.summary);
+    return parts.join("\n");
+  }, [deck, videoUrl, minutes]);
 
   function selectSlide(index: number) {
     setCurrent(Math.max(0, Math.min((deck?.slides.length ?? 1) - 1, index)));
@@ -79,7 +117,7 @@ function SlidesInner() {
         w: 9,
         fontSize: 28,
         bold: true,
-        color: "1f4ed8",
+        color: THEMES[theme].titleColorHex,
         align: "center",
       });
       // Bullets
@@ -90,7 +128,7 @@ function SlidesInner() {
           y: 1.4,
           w: 8,
           fontSize: 16,
-          color: "333333",
+          color: THEMES[theme].bulletColorHex,
         });
       }
       // Speaker notes
@@ -115,30 +153,7 @@ function SlidesInner() {
     setIsPresenting(false);
   }
 
-  async function regenerate() {
-    if (!deck) return;
-    try {
-      setIsRegenerating(true);
-      const proc = await processFromUpload({
-        uploadId: uploadIdFromDeck,
-        language: "es",
-        objective: deck.objective,
-        tone: deck.tone,
-        slidesNumber: deck.slides.length,
-      });
-      if (!proc.ok) throw new Error("Proceso fallido");
-      const newDeck = deckFromProcess(id, deck.objective, deck.tone, proc);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(`deck_${id}`, JSON.stringify(newDeck));
-      }
-      setDeck(newDeck);
-      setCurrent(0);
-    } catch {
-      alert("No se pudo regenerar el deck");
-    } finally {
-      setIsRegenerating(false);
-    }
-  }
+  // regenerate() was removed from UI to avoid unused warnings. Keep logic in landing page.
 
   useEffect(() => {
     function onFsChange() {
@@ -173,26 +188,47 @@ function SlidesInner() {
     <DashboardShell>
       <div className=" h-screen overflow-hidden flex flex-col">
         <div className="sticky top-0 z-10">
-          {/* Top toolbar */}
-          <div className="bg-white border-b px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button onClick={() => videoUrl && setIsVideoOpen(true)} disabled={!videoUrl} className={`px-3 py-2 text-sm border rounded-lg flex items-center gap-2 ${videoUrl ? "bg-orange-500 text-white cursor-pointer" : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}>
-                Ver grabación de origen
+          {/* Top toolbar - minimal */}
+          <div className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200 px-3 sm:px-4 py-2 flex items-center justify-between">
+            {/* Left actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => videoUrl && setIsVideoOpen(true)}
+                disabled={!videoUrl}
+                className={`h-9 px-3 rounded-full inline-flex items-center gap-2 text-xs sm:text-sm ${videoUrl ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500 cursor-not-allowed"}`}
+              >
+                Video original
                 <TvMinimalPlay className="w-4 h-4" />
+                <span className="hidden xs:inline">Ver video</span>
               </button>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="text-xl font-semibold">{deck.slides[current]?.title || "Introducción"}</div>
-              <div className="text-sm text-gray-500">Slide {current + 1} de {deck.slides.length}</div>
+
+            {/* Center title */}
+            <div className="min-w-0 text-center px-2">
+              <div className="truncate font-semibold text-base sm:text-lg">{deck.slides[current]?.title || "Introducción"}</div>
+              <div className="text-[11px] text-gray-500">Slide {current + 1} de {deck.slides.length}</div>
             </div>
-            <div className="flex items-center gap-2 py-1">
-              <button onClick={downloadPptx} className="cursor-pointer px-3 py-2 text-sm border rounded flex items-center gap-2">
-                Descargar Pitch Deck
+
+            {/* Right actions */}
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-1 mr-1">
+                <select
+                  aria-label="Tema de diseño"
+                  className="h-9 rounded-full border bg-white text-xs px-2"
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as keyof typeof THEMES)}
+                >
+                  {Object.entries(THEMES).map(([key, val]) => (
+                    <option key={key} value={key}>{val.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={downloadPptx} className="cursor-pointer h-9 px-3 rounded-full border text-xs sm:text-sm inline-flex items-center gap-2 bg-white hover:bg-gray-50">
+                <span className="hidden sm:inline">Descargar</span>
                 <Download className="w-4 h-4" />
               </button>
-              <button onClick={startPresentation} className="cursor-pointer px-3 py-2 text-sm bg-orange-500 text-white rounded flex items-center gap-2">
-                Presentar 
+              <button onClick={startPresentation} className="cursor-pointer h-9 px-3 rounded-full bg-orange-500 text-white text-xs sm:text-sm inline-flex items-center gap-2">
+                <span className="hidden sm:inline">Presentar</span>
                 <Play className="w-4 h-4" />
               </button>
             </div>
@@ -211,29 +247,52 @@ function SlidesInner() {
         </div>
 
         {/* Main layout */}
-        <div className="flex-1 grid overflow-hidden min-h-0 bg-gray-100" style={{ gridTemplateColumns: `280px 1fr ${notesOpen ? PANEL_WIDTH_OPEN + "px" : PANEL_WIDTH_COLLAPSED + "px"}` }}>
-          {/* Left thumbnails */}
-          <div className="bg-white border-r overflow-y-auto h-full min-h-0">
-            <div className="p-3 space-y-1">
-              {deck.slides.map((sl, idx) => (
-                <div
-                  key={sl.id}
-                  onClick={() => selectSlide(idx)}
-                  className={`cursor-pointer rounded-lg overflow-hidden ${
-                    current === idx ? "bg-orange-100 border-2 border-orange-400" : "bg-white border border-gray-500"
-                  }`}
-                >
-                  <div className="p-2">
-                    <div className="text-xs font-medium text-orange-600">{idx + 1}. {sl.title}</div>
-                    <div className="text-xs text-gray-500 mt-1 line-clamp-2">{sl.bullets[0] || ""}</div>
-                  </div>
-                  <div className="relative h-20 bg-gradient-to-br from-teal-400 to-teal-600">
-                    {sl.imageUrl && (
-                      <Image src={sl.imageUrl} alt="thumb" fill className="object-cover" />
-                    )}
-                  </div>
+        <div className="flex-1 grid overflow-hidden min-h-0 bg-gray-100" style={{ gridTemplateColumns: `${leftOpen ? 280 : 44}px 1fr ${notesOpen ? PANEL_WIDTH_OPEN + "px" : PANEL_WIDTH_COLLAPSED + "px"}` }}>
+          {/* Left thumbnails redesigned */}
+          <div className="relative h-full min-h-0 bg-[#1f1f1f] text-white border-r">
+            {/* Collapse handle */}
+            <button
+              aria-label={leftOpen ? "Contraer panel" : "Expandir panel"}
+              onClick={() => setLeftOpen(!leftOpen)}
+              className="absolute top-1/2 -right-3 z-10 -translate-y-1/2 h-8 w-6 rounded-full bg-gray-700 text-gray-200 grid place-items-center shadow cursor-pointer"
+            >
+              <ChevronLeft className={`w-4 h-4 transition-transform ${leftOpen ? "" : "rotate-180"}`} />
+            </button>
+
+            {/* Content */}
+            <div className={`h-full flex flex-col ${leftOpen ? "opacity-100" : "opacity-0 pointer-events-none"} transition-opacity`}>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto px-2 py-5 pb-12">
+                <div className="space-y-2">
+                  {deck.slides.map((sl, idx) => {
+                    const isActive = current === idx;
+                    return (
+                      <div
+                        key={sl.id}
+                        onClick={() => selectSlide(idx)}
+                        className={`relative h-auto cursor-pointer rounded-lg border overflow-hidden bg-[#2a2a2a] transition-colors ${isActive ? "border-orange-400 ring-2 ring-orange-400/50" : "border-transparent hover:bg-[#333333]"}`}
+                      >
+                        <div className="absolute left-2 top-2 text-[11px] font-medium text-orange-400 tabular-nums">
+                          {String(idx + 1).padStart(2, "0")}
+                        </div>
+                        <div className="pl-9 pr-2 py-2">
+                          <SlideThumb slide={sl} theme={{ bgGradient: THEMES[theme].bgGradient, titleClass: THEMES[theme].titleClass }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              {/* Bottom status */}
+              <div className="sticky bottom-0 p-3 bg-[#1f1f1f] border-t border-[#2a2a2a]">
+                <div className="w-full text-center">
+                  <span className="inline-flex items-center justify-center h-8 px-4 rounded-md bg-orange-500 text-black text-sm font-medium">
+                    Slide {current + 1} / {deck.slides.length}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -242,25 +301,7 @@ function SlidesInner() {
             <div className="w-full max-w-4xl">
               <div className="bg-white rounded-lg shadow-lg overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
                 <div className="h-full flex flex-col">
-                  {/* Slide content area */}
-                  <div className="flex-1 bg-gradient-to-br from-teal-200 via-teal-300 to-teal-500 relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {activeSlide?.imageUrl ? (
-                        <div className="relative w-[70%] h-[55%]">
-                          <Image src={activeSlide.imageUrl} alt={activeSlide.title} fill className="object-contain" />
-                        </div>
-                      ) : (
-                        <div className="bg-white/80 rounded-lg px-6 py-4 text-center text-gray-500 shadow-sm">
-                          <div className="text-sm">Sin imagen para esta lámina</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Title section */}
-                  <div className="bg-white p-8 text-center">
-                    <h1 className="text-3xl font-bold text-blue-600 mb-2">{activeSlide?.title}</h1>
-                    <p className="text-gray-600">{activeSlide?.bullets?.[0]}</p>
-                  </div>
+                  <SlideView slide={activeSlide!} theme={{ bgGradient: THEMES[theme].bgGradient, titleClass: THEMES[theme].titleClass }} />
                 </div>
               </div>
             </div>
@@ -270,25 +311,51 @@ function SlidesInner() {
           <motion.div className="relative h-full min-h-0 border-l border-gray-200 bg-white overflow-hidden shadow-sm" animate={{ width: notesOpen ? PANEL_WIDTH_OPEN : PANEL_WIDTH_COLLAPSED }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
             {/* Sliding content */}
             <motion.div className="absolute inset-0 overflow-y-auto" animate={{ x: notesOpen ? 0 : PANEL_WIDTH_COLLAPSED, opacity: notesOpen ? 1 : 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold">Guión de Pitch Deck</h3>
+              <div className="sticky top-0 z-[1] bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 p-4 border-b flex items-center justify-between">
+                <h3 className="font-semibold">Guión sugerido para Pitch Deck</h3>
                 <button aria-label="Cerrar guión" onClick={() => setNotesOpen(false)} className="h-8 w-8 grid place-items-center rounded-md hover:bg-gray-100">
                   <ChevronRight className="w-6 h-6 text-gray-600" />
                 </button>
               </div>
-              <div className="p-4 text-xs text-gray-500">Notas y texto para el presentador</div>
-              <div className="px-4 pb-4 space-y-4">
-                {deck.slides.map((sl, i) => (
-                  <div key={sl.id}>
-                    <div className="text-xs font-semibold text-gray-600 mb-1">SLIDE {i + 1} - {sl.title.toUpperCase()}</div>
-                    <div className="text-xs text-gray-800 leading-relaxed">{sl.speakerNotes || "Buenos días a todos. Mi nombre es [Nombre] y hoy les presentaré nuestra propuesta de innovación tecnológica que revolucionará la forma en que trabajamos."}</div>
-                  </div>
-                ))}
+              <div className="px-4 py-4 space-y-3">
+                {deck.slides.map((sl, i) => {
+                  const isActive = i === current;
+                  const time = sl.suggestedTimeSec ? Math.round((sl.suggestedTimeSec || 0) / 60) : 0;
+                  const fullText = sl.speakerNotes || "Buenos días a todos. Mi nombre es [Nombre] y hoy les presentaré nuestra propuesta de innovación tecnológica que revolucionará la forma en que trabajamos.";
+                  const isLong = fullText.length > 220;
+                  const expanded = !!expandedNotes[sl.id];
+                  const displayText = expanded || !isLong ? fullText : `${fullText.slice(0, 220)}…`;
+                  return (
+                    <div
+                      key={sl.id}
+                      className={`group rounded-lg border bg-white p-3 transition-shadow hover:shadow-sm ${isActive ? "border-orange-300 ring-1 ring-orange-200" : "border-gray-200"}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`inline-flex h-6 px-2 items-center rounded-full text-[11px] font-medium ${isActive ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-700"}`}>{String(i + 1).padStart(2, "0")}</span>
+                          <div className="truncate text-sm font-medium text-gray-900" title={sl.title}>{sl.title}</div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {time > 0 && (
+                            <span className="inline-flex items-center h-6 px-2 rounded-full bg-sky-50 text-sky-700 text-[11px]">~{time}m</span>
+                          )}
+                          <button className="text-xs text-gray-600 hover:text-gray-900" onClick={() => selectSlide(i)}>Ir</button>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-800 leading-relaxed">{displayText}</p>
+                      {isLong && (
+                        <button className="mt-1 text-[11px] text-gray-600 hover:text-gray-900" onClick={() => toggleExpandNotes(sl.id)}>
+                          {expanded ? "Ver menos" : "Ver más"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="absolute bottom-4 right-4">
-                <button className="flex items-center gap-1 text-xs text-gray-600" onClick={() => setIsVideoOpen(true)}>
+              <div className="absolute bottom-3 right-3">
+                <button className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900" onClick={() => setIsVideoOpen(true)}>
                   <FileText className="w-3 h-3" />
-                  Editar Guión
+                  Editar guión
                 </button>
               </div>
             </motion.div>
@@ -368,14 +435,31 @@ function SlidesInner() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 overflow-y-auto text-sm whitespace-pre-wrap">
-              {summaryText}
+            <div className="p-4 overflow-y-auto text-base">
+              <div className="flex flex-wrap gap-2 mb-3">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs">Objetivo: {deck.objective}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs">Tono: {deck.tone}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs">Slides: {deck.slides.length}</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-100 text-sky-700 text-xs">Tiempo: ~{minutes} min</span>
+              </div>
+              <div className="text-base font-semibold text-gray-600 mb-2 mt-4">Resumen</div>
+              <div className="whitespace-pre-wrap leading-relaxed text-gray-800">
+                {deck.summary || summaryText}
+              </div>
+              {deck.transcriptUrl && (
+                <div className="mt-8">
+                  <div className="text-base font-semibold text-gray-600 mb-2">Transcripción extraída del video (SRT)</div>
+                  <div className="text-base whitespace-pre-wrap text-gray-700 bg-gray-50 border rounded p-3 max-h-60 overflow-y-auto">
+                    {transcript || "Cargando transcripción…"}
+                  </div>
+                </div>
+              )}
             </div>
           </aside>
         </>
       )}
 
-      {isRegenerating && <LoadingOverlay message="Regenerando el Pitch Deck…" />}
+      {/* Future: show overlay while regenerating */}
     </DashboardShell>
   );
 }
